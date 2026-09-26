@@ -1,0 +1,1593 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smilecoin - Web3 Mini App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        darkbg: '#080a0f',
+                        cardbg: 'rgba(18, 24, 38, 0.75)',
+                        accent: '#FFB800',
+                    },
+                    keyframes: {
+                        floatUp: {
+                            '0%': { opacity: '1', transform: 'translateY(0) scale(1)' },
+                            '100%': { opacity: '0', transform: 'translateY(-70px) scale(1.2)' }
+                        },
+                        popIn: {
+                            '0%': { opacity: '0', transform: 'scale(0.9) translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'scale(1) translateY(0)' }
+                        },
+                        pulseGlow: {
+                            '0%, 100%': { opacity: '0.4', transform: 'scale(1)' },
+                            '50%': { opacity: '0.8', transform: 'scale(1.05)' }
+                        }
+                    },
+                    animation: {
+                        floatUp: 'floatUp 0.75s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards',
+                        popIn: 'popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                        pulseGlow: 'pulseGlow 2s infinite ease-in-out'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #030508;
+            color: #e2e8f0;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            overflow-x: hidden;
+        }
+        .glass-panel {
+            background: rgba(13, 17, 28, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+        }
+        .glass-btn {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.15s ease;
+        }
+        .glass-btn:active {
+            transform: scale(0.96);
+            background: rgba(255, 255, 255, 0.09);
+        }
+        .coin-shadow {
+            box-shadow: 0 10px 30px -5px rgba(255, 184, 0, 0.2);
+        }
+        .secret-rainbow {
+            background: linear-gradient(135deg, #ec4899, #8b5cf6, #3b82f6);
+        }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center bg-slate-950 p-0 sm:p-4">
+
+    <div id="root" class="w-full max-w-md h-screen sm:h-[880px] sm:rounded-[32px] bg-[#07090e] text-white flex flex-col overflow-hidden relative shadow-2xl border border-slate-900"></div>
+
+    <script type="text/babel">
+        // Extracting React Hooks safely
+        const { useState, useEffect, useRef } = React;
+
+        // SoundFX Synthesizer using Web Audio API
+        class SoundFX {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContext) this.ctx = new AudioContext();
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playPop(freqMultiplier = 1) {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    const now = this.ctx.currentTime;
+
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(320 * freqMultiplier, now);
+                    osc.frequency.exponentialRampToValueAtTime(800 * freqMultiplier, now + 0.08);
+
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start(now);
+                    osc.stop(now + 0.08);
+                } catch(e){}
+            }
+
+            playTick() {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    const now = this.ctx.currentTime;
+
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(900, now);
+                    gain.gain.setValueAtTime(0.06, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start(now);
+                    osc.stop(now + 0.03);
+                } catch(e){}
+            }
+
+            playWin() {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+                try {
+                    const now = this.ctx.currentTime;
+                    const freqs = [440, 554.37, 659.25, 880];
+                    freqs.forEach((f, idx) => {
+                        const osc = this.ctx.createOscillator();
+                        const gain = this.ctx.createGain();
+                        const start = now + idx * 0.08;
+
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(f, start);
+
+                        gain.gain.setValueAtTime(0.18, start);
+                        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.22);
+
+                        osc.connect(gain);
+                        gain.connect(this.ctx.destination);
+
+                        osc.start(start);
+                        osc.stop(start + 0.22);
+                    });
+                } catch(e){}
+            }
+
+            playFever() {
+                if (!this.enabled) return;
+                this.init();
+                if (!this.ctx) return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    const now = this.ctx.currentTime;
+
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(220, now);
+                    osc.frequency.exponentialRampToValueAtTime(880, now + 0.25);
+
+                    gain.gain.setValueAtTime(0.12, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start(now);
+                    osc.stop(now + 0.25);
+                } catch(e){}
+            }
+        }
+
+        const soundFX = new SoundFX();
+
+        // Rarities Database
+        const RARITIES = {
+            COMMON: { name: 'Обычный', color: 'border-slate-700 bg-slate-900/80 text-slate-300', badge: 'bg-slate-800 text-slate-300', val: 5 },
+            RARE: { name: 'Редкий', color: 'border-blue-500/40 bg-blue-950/30 text-blue-400', badge: 'bg-blue-600 text-white', val: 15 },
+            EPIC: { name: 'Эпический', color: 'border-purple-500/40 bg-purple-950/30 text-purple-300', badge: 'bg-purple-600 text-white', val: 35 },
+            LEGENDARY: { name: 'Легендарный', color: 'border-amber-500/50 bg-amber-950/30 text-amber-300', badge: 'bg-amber-500 text-black font-bold', val: 80 },
+            SECRET: { name: 'Секретный', color: 'border-pink-500 secret-rainbow text-white', badge: 'bg-gradient-to-r from-pink-500 to-yellow-400 text-black font-extrabold', val: 200 }
+        };
+
+        const EMOJI_BASE = [
+            { e: "😀", n: "Классик" }, { e: "😁", n: "Сияющий" }, { e: "😂", n: "Хохотун" }, { e: "😃", n: "Весельчак" },
+            { e: "😄", n: "Добряк" }, { e: "😅", n: "Смущенный" }, { e: "😆", n: "Смешинка" }, { e: "😉", n: "Хитрый" },
+            { e: "😊", n: "Милаш" }, { e: "😋", n: "Лакомка" }, { e: "😎", n: "Крутой" }, { e: "😍", n: "Влюбленный" },
+            { e: "😘", n: "Поцелуйчик" }, { e: "🥰", n: "Нежность" }, { e: "😗", n: "Свистун" }, { e: "😙", n: "Певец" },
+            { e: "😚", n: "Скромняш" }, { e: "🙂", n: "Смайлик" }, { e: "🤗", n: "Обнимашка" }, { e: "🤩", n: "Звезда" },
+            { e: "🤔", n: "Мыслитель" }, { e: "🤨", n: "Скептик" }, { e: "😐", n: "Нейтрал" }, { e: "😑", n: "Покерфейс" },
+            { e: "😶", n: "Молчун" }, { e: "🙄", n: "Загадочный" }, { e: "😏", n: "Ухмылка" }, { e: "😣", n: "Упрямец" },
+            { e: "😥", n: "Вздох" }, { e: "😮", n: "Удивленный" }, { e: "🤐", n: "Секретчик" }, { e: "😯", n: "Шок" },
+            { e: "😪", n: "Соня" }, { e: "😫", n: "Уставший" }, { e: "🥱", n: "Зевота" }, { e: "😴", n: "Дрима" },
+            { e: "😌", n: "Умиротворение" }, { e: "😛", n: "Дразнилка" }, { e: "😜", n: "Шалун" }, { e: "😝", n: "Озорник" },
+            { e: "🤤", n: "Слюнки" }, { e: "😒", n: "Пессимист" }, { e: "😓", n: "Трудяга" }, { e: "😔", n: "Грустинка" },
+            { e: "😕", n: "Замешательство" }, { e: "🙃", n: "Перевертыш" }, { e: "🫠", n: "Тающий" }, { e: "😷", n: "Масочник" },
+            { e: "🤒", n: "Градусник" }, { e: "🤕", n: "Бинтик" }, { e: "🤢", n: "Зеленка" }, { e: "🤮", n: "Всплеск" },
+            { e: "🤧", n: "Чих" }, { e: "🥵", n: "Жара" }, { e: "🥶", n: "Мороз" }, { e: "🥴", n: "Диззи" },
+            { e: "😵", n: "Оглушенный" }, { e: "🤯", n: "Взрыв Мозга" }, { e: "🤠", n: "Ковбой" }, { e: "🥳", n: "Тусовщик" },
+            { e: "🥸", n: "Маскировка" }, { e: "🧐", n: "Детектив" }, { e: "🤓", n: "Ботаник" }, { e: "😈", n: "Чертенок" },
+            { e: "👿", n: "Гоблин" },
+            
+            // Rare
+            { e: "👹", n: "Огр" }, { e: "👺", n: "Тенгу" }, { e: "💀", n: "Черепок" }, { e: "☠️", n: "Пират" },
+            { e: "👻", n: "Призрак" }, { e: "👽", n: "Пришелец" }, { e: "👾", n: "Аркада" }, { e: "🤖", n: "Робо" },
+            { e: "🎃", n: "Тыковка" }, { e: "😺", n: "Котэ" }, { e: "😸", n: "Счастливый Кот" }, { e: "😹", n: "Кот-хохотун" },
+            { e: "😻", n: "Кот-романтик" }, { e: "😼", n: "Кот-хитрец" }, { e: "😽", n: "Кот-поцелуй" }, { e: "🙀", n: "Шок-Кот" },
+            { e: "😿", n: "Плачущий Кот" }, { e: "😾", n: "Сердитый Кот" }, { e: "🙈", n: "Ничего не вижу" }, { e: "🙉", n: "Ничего не слышу" },
+            { e: "🙊", n: "Никому не скажу" }, { e: "💥", n: "БУМ!" }, { e: "💫", n: "Созвездие" }, { e: "💦", n: "Капли" },
+            { e: "💨", n: "Порыв" }, { e: "💣", n: "Бомба" }, { e: "💬", n: "Бабл" }, { e: "👁️‍🗨️", n: "Око" },
+            { e: "💤", n: "Сон" }, { e: "🔥", n: "Огонек" }, { e: "✨", n: "Искра" }, { e: "🎈", n: "Шарик" },
+            { e: "🎉", n: "Хлопушка" }, { e: "🎁", n: "Подарок" }, { e: "🎨", n: "Палитра" }, { e: "🎭", n: "Театр" },
+            { e: "🎪", n: "Цирк" }, { e: "🎤", n: "Микрофон" }, { e: "🎧", n: "Диджей" }, { e: "🎷", n: "Джаз" },
+            { e: "🎸", n: "Рокер" }, { e: "🎹", n: "Пианист" }, { e: "🎺", n: "Трубач" }, { e: "🎻", n: "Скрипач" },
+            { e: "🥁", n: "Барабанщик" },
+
+            // Epic
+            { e: "🎬", n: "Режиссер" }, { e: "🎮", n: "Геймер" }, { e: "🎯", n: "Снайпер" }, { e: "🎲", n: "Рандом" },
+            { e: "🎰", n: "Джекпот" }, { e: "🔮", n: "Маг" }, { e: "🧿", n: "Амулет" }, { e: "🪬", n: "Хамса" },
+            { e: "🎩", n: "Фокусник" }, { e: "🏆", n: "Кубок" }, { e: "🥇", n: "Чемпион" }, { e: "🚀", n: "Ракета" },
+            { e: "⚡", n: "Молния" }, { e: "🌟", n: "Суперзвезда" }, { e: "🪐", n: "Сатурн" }, { e: "🌌", n: "Галактика" },
+            { e: "🛸", n: "НЛО" }, { e: "🌋", n: "Вулкан" }, { e: "🌠", n: "Метеор" }, { e: "💎", n: "Алмаз" },
+            { e: "💰", n: "Мешок S$" }, { e: "💳", n: "Криптокарта" }, { e: "🔱", n: "Трезубец" }, { e: "👑", n: "Корона" },
+            { e: "⚜️", n: "Геральдика" },
+
+            // Legendary
+            { e: "🐉", n: "Дракон" }, { e: "🐲", n: "Владыка Драконов" }, { e: "🦄", n: "Единорог" }, { e: "🦅", n: "Феникс" },
+            { e: "🦁", n: "Лев-Царь" }, { e: "🐯", n: "Тигр-Воин" }, { e: "☸️", n: "Фортуна" }, { e: "☯️", n: "Инь-Ян" },
+            { e: "⚛️", n: "Квант" }, { e: "🧿", n: "Око Судьбы" }, { e: "🪐", n: "Космо-Царь" },
+
+            // Secret
+            { e: "🌌", n: "Создатель Миров" }, { e: "👑", n: "Smilecoin God" }, { e: "🪺", n: "Золотое Яйцо" }, { e: "💫", n: "Сингулярность" }
+        ];
+
+        const generate150Smileys = () => {
+            const list = [];
+            for (let i = 0; i < 150; i++) {
+                const base = EMOJI_BASE[i % EMOJI_BASE.length];
+                let rarity = 'COMMON';
+                if (i >= 65 && i < 110) rarity = 'RARE';
+                else if (i >= 110 && i < 135) rarity = 'EPIC';
+                else if (i >= 135 && i < 146) rarity = 'LEGENDARY';
+                else if (i >= 146) rarity = 'SECRET';
+
+                list.push({
+                    id: i + 1,
+                    name: `${base.n} ${i >= EMOJI_BASE.length ? `#${i+1}` : ''}`,
+                    emoji: base.e,
+                    rarity: rarity,
+                    desc: `Коллекционный смайлик #${i + 1} редкие качества ${RARITIES[rarity].name}.`
+                });
+            }
+            return list;
+        };
+
+        const SMILEYS_DB = generate150Smileys();
+
+        // SVG Icons
+        const Icon = ({ name, className = "w-5 h-5" }) => {
+            const icons = {
+                clicker: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />,
+                shop: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />,
+                collection: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />,
+                boosts: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />,
+                profile: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />,
+                coin: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />,
+                lock: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />,
+                soundOn: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z" />,
+                soundOff: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />,
+                edit: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />,
+                bot: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />,
+                sparkles: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+            };
+            return (
+                <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    {icons[name] || null}
+                </svg>
+            );
+        };
+
+        // Rank Badge Component
+        function RankBadge({ rank, large = false }) {
+            const config = {
+                'Игрок': { label: 'Игрок', bg: 'bg-slate-800 text-slate-300 border-slate-700', icon: '👤' },
+                'Золото': { label: 'Золото', bg: 'bg-amber-500/20 text-amber-300 border-amber-500/40', icon: '🪙' },
+                'Ютубер': { label: 'Ютубер', bg: 'bg-red-500/20 text-red-400 border-red-500/40', icon: '▶️' },
+                'Разработчик': { label: 'Разработчик', bg: 'bg-purple-500/20 text-purple-300 border-purple-500/40', icon: '💻' }
+            };
+
+            const current = config[rank] || config['Игрок'];
+
+            return (
+                <span className={`inline-flex items-center gap-1 border rounded-md font-bold ${large ? 'px-2 py-0.5 text-xs' : 'px-1.5 py-0.2 text-[9px]'} ${current.bg}`}>
+                    <span>{current.icon}</span>
+                    <span>{current.label}</span>
+                </span>
+            );
+        }
+
+        const INITIAL_STATE = {
+            balance: 100,
+            energy: 1000,
+            maxEnergy: 1000,
+            energyRecharge: 2,
+            clickPower: 1,
+            botLevel: 0,
+            rank: 'Игрок',
+            nickname: `HappySmile_${Math.floor(100 + Math.random() * 900)}`,
+            avatarId: 1,
+            bgGradient: 'from-slate-800 to-slate-900',
+            hasCustomBg: false,
+            unlockedSmileys: [1],
+            inventoryCases: { common: 0, epic: 0, mythic: 0 },
+            totalClicks: 0,
+            casesOpened: 0,
+            totalSpent: 0,
+            soundEnabled: true,
+            hapticEnabled: true,
+            dailyStreak: 1,
+            claimedDailyDay: 0,
+            lastDailyClaimTime: 0,
+            lastSaveTime: Date.now(),
+            usedPromoCodes: [],
+            quests: {
+                clicks100: false,
+                clicks500: false,
+                cases3: false
+            }
+        };
+
+        const PROMO_CODES_DB = {
+            'WELCOME': { rewardCoins: 250, rewardPower: 0, desc: '+250 S$ стартовый бонус' },
+            'SMILE2026': { rewardCoins: 500, rewardPower: 0, desc: '+500 S$' },
+            'CRYPTO': { rewardCoins: 1000, rewardPower: 0, desc: '+1000 S$' },
+            'SUPERBOOST': { rewardCoins: 500, rewardPower: 3, desc: '+500 S$ и +3 к силе клика' }
+        };
+
+        // Main App Component
+        function App() {
+            const [state, setState] = useState(() => {
+                const saved = localStorage.getItem('Smilecoin_SaveData');
+                if (saved) {
+                    try { return { ...INITIAL_STATE, ...JSON.parse(saved) }; } catch(e){}
+                }
+                return INITIAL_STATE;
+            });
+
+            const [activeTab, setActiveTab] = useState('clicker');
+            const [floatingTexts, setFloatingTexts] = useState([]);
+            const [feverActive, setFeverActive] = useState(false);
+            const [comboMeter, setComboMeter] = useState(0);
+            const [selectedSmileyModal, setSelectedSmileyModal] = useState(null);
+            const [offlineModalData, setOfflineModalData] = useState(null);
+            const [editNickModal, setEditNickModal] = useState(false);
+            const [newNickInput, setNewNickInput] = useState(state.nickname);
+
+            useEffect(() => {
+                soundFX.enabled = state.soundEnabled;
+            }, [state.soundEnabled]);
+
+            // Save state on every state change
+            useEffect(() => {
+                const dataToSave = { ...state, lastSaveTime: Date.now() };
+                localStorage.setItem('Smilecoin_SaveData', JSON.stringify(dataToSave));
+            }, [state]);
+
+            // Offline Earnings Check
+            useEffect(() => {
+                if (state.botLevel > 0 && state.lastSaveTime) {
+                    const elapsedSec = Math.floor((Date.now() - state.lastSaveTime) / 1000);
+                    if (elapsedSec > 10) {
+                        const earned = Math.min(elapsedSec * state.botLevel * 1, 5000);
+                        if (earned > 0) {
+                            setState(prev => ({ ...prev, balance: prev.balance + earned }));
+                            setOfflineModalData({ timeSec: elapsedSec, earned });
+                        }
+                    }
+                }
+            }, []);
+
+            // Energy & Auto-miner Timer Loop
+            useEffect(() => {
+                const timer = setInterval(() => {
+                    setState(prev => {
+                        let newEnergy = Math.min(prev.maxEnergy, prev.energy + prev.energyRecharge);
+                        let botIncome = prev.botLevel > 0 ? prev.botLevel * 1 : 0;
+                        return {
+                            ...prev,
+                            energy: newEnergy,
+                            balance: prev.balance + botIncome
+                        };
+                    });
+                }, 1000);
+                return () => clearInterval(timer);
+            }, []);
+
+            // Combo Decay
+            useEffect(() => {
+                if (comboMeter > 0 && !feverActive) {
+                    const decay = setTimeout(() => setComboMeter(prev => Math.max(0, prev - 15)), 600);
+                    return () => clearTimeout(decay);
+                }
+            }, [comboMeter, feverActive]);
+
+            const triggerHaptic = () => {
+                if (state.hapticEnabled && window.navigator && window.navigator.vibrate) {
+                    window.navigator.vibrate(25);
+                }
+            };
+
+            const handleCoinClick = (e) => {
+                if (state.energy <= 0) return;
+
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = e.clientX ? e.clientX - rect.left : rect.width / 2;
+                const y = e.clientY ? e.clientY - rect.top : rect.height / 2;
+
+                const multiplier = feverActive ? 2 : 1;
+                const addedAmount = state.clickPower * multiplier;
+
+                soundFX.playPop(feverActive ? 1.4 : 1);
+                triggerHaptic();
+
+                const newText = {
+                    id: Date.now() + Math.random(),
+                    x,
+                    y,
+                    text: `+${addedAmount}`
+                };
+                setFloatingTexts(prev => [...prev.slice(-15), newText]);
+
+                if (!feverActive) {
+                    const nextCombo = comboMeter + 12;
+                    if (nextCombo >= 100) {
+                        setFeverActive(true);
+                        soundFX.playFever();
+                        setTimeout(() => {
+                            setFeverActive(false);
+                            setComboMeter(0);
+                        }, 7000);
+                    } else {
+                        setComboMeter(nextCombo);
+                    }
+                }
+
+                setState(prev => {
+                    const newClicks = prev.totalClicks + 1;
+                    const newBalance = prev.balance + addedAmount;
+                    
+                    const updatedQuests = { ...prev.quests };
+                    if (newClicks >= 100) updatedQuests.clicks100 = true;
+                    if (newClicks >= 500) updatedQuests.clicks500 = true;
+
+                    return {
+                        ...prev,
+                        balance: newBalance,
+                        energy: Math.max(0, prev.energy - 1),
+                        totalClicks: newClicks,
+                        quests: updatedQuests
+                    };
+                });
+            };
+
+            return (
+                <div className="w-full h-full flex flex-col justify-between relative select-none overflow-hidden">
+                    
+                    {/* TOP HEADER */}
+                    <div className="glass-panel px-4 py-3 m-3 mb-1 rounded-2xl flex items-center justify-between z-20 shadow-lg">
+                        <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setActiveTab('profile')}>
+                            <div className={`w-10 h-10 rounded-xl bg-gradient-to-tr ${state.bgGradient} flex items-center justify-center text-xl shadow border border-white/10`}>
+                                {SMILEYS_DB.find(s => s.id === state.avatarId)?.emoji || "😀"}
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-1.5">
+                                    <div className="text-xs font-bold text-slate-100 truncate max-w-[100px]">{state.nickname}</div>
+                                    <RankBadge rank={state.rank || 'Игрок'} />
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-medium leading-tight">Профиль</div>
+                            </div>
+                        </div>
+
+                        {/* BALANCE DISPLAY */}
+                        <div className="flex items-center space-x-2 bg-slate-900/90 px-3.5 py-1.5 rounded-xl border border-amber-500/30 shadow-inner">
+                            <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-amber-400 to-yellow-200 flex items-center justify-center text-black font-extrabold text-[10px] shadow">S$</div>
+                            <span className="text-base font-extrabold text-amber-400 tracking-wide">{state.balance.toLocaleString()}</span>
+                        </div>
+                    </div>
+
+                    {/* MAIN CONTENT VIEW */}
+                    <div className="flex-1 overflow-y-auto px-3 py-2 relative z-10">
+                        {activeTab === 'clicker' && (
+                            <ClickerTab 
+                                state={state} 
+                                handleCoinClick={handleCoinClick} 
+                                floatingTexts={floatingTexts} 
+                                feverActive={feverActive} 
+                                comboMeter={comboMeter} 
+                            />
+                        )}
+
+                        {activeTab === 'shop' && (
+                            <ShopTab state={state} setState={setState} triggerHaptic={triggerHaptic} />
+                        )}
+
+                        {activeTab === 'collection' && (
+                            <CollectionTab state={state} onSelectSmiley={(smiley) => setSelectedSmileyModal(smiley)} />
+                        )}
+
+                        {activeTab === 'boosts' && (
+                            <BoostsAndQuestsTab state={state} setState={setState} triggerHaptic={triggerHaptic} />
+                        )}
+
+                        {activeTab === 'profile' && (
+                            <ProfileTab 
+                                state={state} 
+                                setState={setState} 
+                                setEditNickModal={setEditNickModal}
+                                triggerHaptic={triggerHaptic} 
+                            />
+                        )}
+                    </div>
+
+                    {/* NAVIGATION BAR */}
+                    <div className="glass-panel mx-3 mb-3 p-1.5 rounded-2xl flex justify-around items-center z-20 shadow-xl border-t border-white/5">
+                        <NavButton icon="clicker" label="Клик" active={activeTab === 'clicker'} onClick={() => { soundFX.playTick(); setActiveTab('clicker'); }} />
+                        <NavButton icon="shop" label="Кейсы" active={activeTab === 'shop'} onClick={() => { soundFX.playTick(); setActiveTab('shop'); }} />
+                        <NavButton icon="collection" label="Коллекция" active={activeTab === 'collection'} onClick={() => { soundFX.playTick(); setActiveTab('collection'); }} />
+                        <NavButton icon="boosts" label="Бусты" active={activeTab === 'boosts'} onClick={() => { soundFX.playTick(); setActiveTab('boosts'); }} />
+                        <NavButton icon="profile" label="Профиль" active={activeTab === 'profile'} onClick={() => { soundFX.playTick(); setActiveTab('profile'); }} />
+                    </div>
+
+                    {/* MODALS */}
+                    {selectedSmileyModal && (
+                        <SmileyDetailModal 
+                            smiley={selectedSmileyModal} 
+                            isUnlocked={state.unlockedSmileys.includes(selectedSmileyModal.id)} 
+                            isAvatar={state.avatarId === selectedSmileyModal.id}
+                            onSetAvatar={() => {
+                                setState(prev => ({ ...prev, avatarId: selectedSmileyModal.id }));
+                                setSelectedSmileyModal(null);
+                                soundFX.playWin();
+                            }}
+                            onClose={() => setSelectedSmileyModal(null)} 
+                        />
+                    )}
+
+                    {offlineModalData && (
+                        <OfflineEarnModal 
+                            data={offlineModalData} 
+                            onClose={() => setOfflineModalData(null)} 
+                        />
+                    )}
+
+                    {editNickModal && (
+                        <EditNickModal 
+                            nickname={newNickInput} 
+                            setNickname={setNewNickInput}
+                            onSave={() => {
+                                if (newNickInput.trim()) {
+                                    setState(prev => ({ ...prev, nickname: newNickInput.trim() }));
+                                }
+                                setEditNickModal(false);
+                            }}
+                            onClose={() => setEditNickModal(false)}
+                        />
+                    )}
+
+                </div>
+            );
+        }
+
+        function NavButton({ icon, label, active, onClick }) {
+            return (
+                <button 
+                    onClick={onClick} 
+                    className={`flex flex-col items-center justify-center py-1.5 px-3 rounded-xl transition-all duration-150 ${
+                        active 
+                            ? 'text-amber-400 bg-amber-400/10 font-bold border border-amber-400/20' 
+                            : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                >
+                    <Icon name={icon} className="w-5 h-5 mb-0.5" />
+                    <span className="text-[10px] tracking-tight">{label}</span>
+                </button>
+            );
+        }
+
+        function ClickerTab({ state, handleCoinClick, floatingTexts, feverActive, comboMeter }) {
+            return (
+                <div className="h-full flex flex-col justify-between items-center py-2 relative overflow-hidden">
+                    
+                    <div className="w-full flex flex-col items-center my-1">
+                        <div className="h-1.5 w-40 bg-slate-900 rounded-full overflow-hidden border border-slate-800 relative">
+                            <div 
+                                className={`h-full transition-all duration-300 ${feverActive ? 'bg-amber-400 animate-pulse' : 'bg-amber-400/80'}`} 
+                                style={{ width: `${feverActive ? 100 : comboMeter}%` }}
+                            />
+                        </div>
+                        <div className="mt-1 text-[10px] font-medium tracking-wide">
+                            {feverActive ? (
+                                <span className="text-amber-400 font-bold flex items-center gap-1">
+                                    ⚡ РЕЖИМ ЛИХОРАДКИ (x2)
+                                </span>
+                            ) : (
+                                <span className="text-slate-500">Комбо: {comboMeter}%</span>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="relative my-auto flex items-center justify-center">
+                        <button
+                            onClick={handleCoinClick}
+                            className={`w-48 h-48 rounded-full bg-gradient-to-b from-amber-300/90 via-amber-500 to-amber-600 p-1.5 shadow-xl border border-amber-300/40 active:scale-95 transition-transform duration-75 relative flex items-center justify-center coin-shadow cursor-pointer ${
+                                feverActive ? 'ring-4 ring-amber-400/50' : ''
+                            }`}
+                        >
+                            <div className="w-full h-full rounded-full bg-[#0b0e17] flex items-center justify-center shadow-inner relative overflow-hidden">
+                                <span className="text-7xl select-none filter drop-shadow transform transition-transform duration-150 active:scale-105">
+                                    😃
+                                </span>
+                            </div>
+                        </button>
+
+                        {floatingTexts.map(item => (
+                            <div 
+                                key={item.id}
+                                className="absolute pointer-events-none font-bold text-lg text-amber-300 animate-floatUp"
+                                style={{ left: `${item.x}px`, top: `${item.y}px` }}
+                            >
+                                {item.text}
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="w-full glass-panel p-3 rounded-2xl border border-white/5 shadow-md">
+                        <div className="flex justify-between items-center text-xs font-medium mb-1.5">
+                            <span className="flex items-center gap-1 text-slate-300">
+                                <Icon name="boosts" className="w-3.5 h-3.5 text-amber-400" /> Энергия
+                            </span>
+                            <span className="text-slate-400">{state.energy} / {state.maxEnergy}</span>
+                        </div>
+                        <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden p-0.5">
+                            <div 
+                                className="h-full bg-amber-400 rounded-full transition-all duration-300"
+                                style={{ width: `${(state.energy / state.maxEnergy) * 100}%` }}
+                            />
+                        </div>
+                        <div className="text-[10px] text-slate-500 text-center mt-1.5">
+                            Клик: <span className="text-slate-300 font-semibold">+{state.clickPower * (feverActive ? 2 : 1)} S$</span> | Восстановление: <span className="text-slate-300 font-semibold">+{state.energyRecharge}/сек</span>
+                        </div>
+                    </div>
+
+                </div>
+            );
+        }
+
+        function ShopTab({ state, setState, triggerHaptic }) {
+            const [spinning, setSpinning] = useState(false);
+            const [activeCaseOpening, setActiveCaseOpening] = useState(null);
+            const [rouletteItems, setRouletteItems] = useState([]);
+            const [wonModal, setWonModal] = useState(null);
+            const [message, setMessage] = useState(null);
+            const stripRef = useRef(null);
+
+            const CASES = [
+                { id: 'common', name: 'Обычный Кейс', price: 20, desc: 'Шанс Common и Rare смайликов.', icon: '📦', color: 'from-slate-800 to-slate-950 border-slate-700' },
+                { id: 'epic', name: 'Эпический Кейс', price: 50, desc: 'Высокий шанс Epic и Legendary.', icon: '🎁', color: 'from-purple-900/60 to-slate-950 border-purple-500/40' },
+                { id: 'mythic', name: 'Мифический Кейс', price: 100, desc: 'Шанс редчайших Secret/Mythic смайликов!', icon: '👑', color: 'from-amber-900/60 to-slate-950 border-amber-500/40' }
+            ];
+
+            const getRandomSmileyForCase = (caseId) => {
+                let pool = [];
+                if (caseId === 'common') {
+                    pool = SMILEYS_DB.filter(s => s.rarity === 'COMMON' || s.rarity === 'RARE');
+                } else if (caseId === 'epic') {
+                    pool = SMILEYS_DB.filter(s => s.rarity === 'RARE' || s.rarity === 'EPIC' || s.rarity === 'LEGENDARY');
+                } else {
+                    pool = SMILEYS_DB.filter(s => s.rarity === 'EPIC' || s.rarity === 'LEGENDARY' || s.rarity === 'SECRET');
+                }
+                return pool[Math.floor(Math.random() * pool.length)];
+            };
+
+            const buyCase = (caseItem) => {
+                if (state.balance < caseItem.price) return;
+
+                setState(prev => {
+                    const currentInv = prev.inventoryCases || { common: 0, epic: 0, mythic: 0 };
+                    return {
+                        ...prev,
+                        balance: prev.balance - caseItem.price,
+                        totalSpent: prev.totalSpent + caseItem.price,
+                        inventoryCases: {
+                            ...currentInv,
+                            [caseItem.id]: (currentInv[caseItem.id] || 0) + 1
+                        }
+                    };
+                });
+                soundFX.playWin();
+                triggerHaptic();
+                setMessage(`Кейс "${caseItem.name}" куплен и добавлен в инвентарь!`);
+                setTimeout(() => setMessage(null), 2500);
+            };
+
+            const openCase = (caseItem) => {
+                const ownedCount = (state.inventoryCases && state.inventoryCases[caseItem.id]) || 0;
+                if (ownedCount <= 0 || spinning) return;
+
+                setState(prev => {
+                    const currentInv = prev.inventoryCases || { common: 0, epic: 0, mythic: 0 };
+                    const newCasesOpened = prev.casesOpened + 1;
+                    const updatedQuests = { ...prev.quests };
+                    if (newCasesOpened >= 3) updatedQuests.cases3 = true;
+
+                    return {
+                        ...prev,
+                        casesOpened: newCasesOpened,
+                        quests: updatedQuests,
+                        inventoryCases: {
+                            ...currentInv,
+                            [caseItem.id]: Math.max(0, (currentInv[caseItem.id] || 0) - 1)
+                        }
+                    };
+                });
+
+                setActiveCaseOpening(caseItem.name);
+
+                const strip = [];
+                for (let i = 0; i < 45; i++) {
+                    strip.push(getRandomSmileyForCase(caseItem.id));
+                }
+                const winner = getRandomSmileyForCase(caseItem.id);
+                strip[38] = winner;
+
+                setRouletteItems(strip);
+                setSpinning(false);
+
+                setTimeout(() => {
+                    setSpinning(true);
+
+                    let ticks = 0;
+                    const tickInterval = setInterval(() => {
+                        ticks++;
+                        soundFX.playTick();
+                        if (ticks > 30) clearInterval(tickInterval);
+                    }, 120);
+
+                    setTimeout(() => {
+                        soundFX.playWin();
+                        triggerHaptic();
+                        setSpinning(false);
+                        setActiveCaseOpening(null);
+
+                        const isDuplicate = state.unlockedSmileys.includes(winner.id);
+                        const bonusVal = RARITIES[winner.rarity].val;
+
+                        if (isDuplicate) {
+                            setState(prev => ({ ...prev, balance: prev.balance + bonusVal }));
+                        } else {
+                            setState(prev => ({ ...prev, unlockedSmileys: [...prev.unlockedSmileys, winner.id] }));
+                        }
+
+                        setWonModal({ smiley: winner, isDuplicate, bonusVal });
+                    }, 4000);
+                }, 50);
+            };
+
+            return (
+                <div className="flex flex-col gap-3 py-2">
+                    <div className="text-center">
+                        <h2 className="text-base font-extrabold text-white flex items-center justify-center gap-1.5">
+                            <Icon name="shop" className="w-5 h-5 text-amber-400" /> Магазин и Инвентарь Кейсов
+                        </h2>
+                        <p className="text-[11px] text-slate-400">Покупай кейсы в инвентарь и открывай их, чтобы собрать 150 смайликов!</p>
+                    </div>
+
+                    {message && (
+                        <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-center text-xs text-amber-300 font-bold animate-popIn">
+                            {message}
+                        </div>
+                    )}
+
+                    {rouletteItems.length > 0 && (
+                        <div className="glass-panel p-3 rounded-2xl border border-amber-500/30 overflow-hidden relative shadow-2xl">
+                            <div className="text-[11px] font-bold text-amber-400 mb-1 text-center flex items-center justify-center gap-1">
+                                <Icon name="sparkles" className="w-3.5 h-3.5" /> {spinning ? `Открытие: ${activeCaseOpening}...` : 'Результат'}
+                            </div>
+                            
+                            <div className="absolute left-1/2 top-7 bottom-2 w-1 bg-amber-400 z-20 transform -translate-x-1/2 shadow-[0_0_10px_#ffb800]"></div>
+
+                            <div className="overflow-hidden w-full relative py-2">
+                                <div 
+                                    ref={stripRef}
+                                    className="flex gap-2"
+                                    style={{
+                                        transform: spinning 
+                                            ? `translateX(-${38 * 88 - 140}px)` 
+                                            : 'translateX(0px)',
+                                        transition: spinning ? 'transform 4000ms cubic-bezier(0.1, 0.9, 0.2, 1)' : 'none'
+                                    }}
+                                >
+                                    {rouletteItems.map((item, idx) => (
+                                        <div 
+                                            key={idx}
+                                            className={`min-w-[80px] h-20 rounded-xl border flex flex-col items-center justify-center p-1.5 text-center bg-slate-900/90 ${RARITIES[item.rarity].color}`}
+                                        >
+                                            <span className="text-2xl">{item.emoji}</span>
+                                            <span className="text-[9px] font-bold mt-1 truncate w-full">{item.name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="space-y-2.5">
+                        {CASES.map(c => {
+                            const ownedCount = (state.inventoryCases && state.inventoryCases[c.id]) || 0;
+                            return (
+                                <div key={c.id} className={`glass-panel p-3.5 rounded-2xl border bg-gradient-to-r ${c.color} flex flex-col gap-2 shadow-md`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="text-3xl filter drop-shadow">{c.icon}</div>
+                                            <div>
+                                                <div className="font-bold text-xs text-white">{c.name}</div>
+                                                <div className="text-[10px] text-slate-400 max-w-[160px] leading-tight">{c.desc}</div>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-[10px] text-slate-400 font-medium">В наличии:</div>
+                                            <div className="text-xs font-black text-amber-400">{ownedCount} шт.</div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-2 pt-1 border-t border-white/5">
+                                        <button
+                                            disabled={state.balance < c.price || spinning}
+                                            onClick={() => buyCase(c)}
+                                            className={`flex-1 py-1.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition-all shadow ${
+                                                state.balance >= c.price && !spinning
+                                                    ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-400/30 active:scale-95'
+                                                    : 'bg-slate-900/80 text-slate-600 border border-slate-800 cursor-not-allowed'
+                                            }`}
+                                        >
+                                            <span>Купить за {c.price} S$</span>
+                                        </button>
+
+                                        <button
+                                            disabled={ownedCount <= 0 || spinning}
+                                            onClick={() => openCase(c)}
+                                            className={`flex-1 py-1.5 rounded-xl font-extrabold text-xs flex items-center justify-center gap-1 transition-all shadow ${
+                                                ownedCount > 0 && !spinning
+                                                    ? 'bg-amber-400 hover:bg-amber-300 text-black active:scale-95'
+                                                    : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                                            }`}
+                                        >
+                                            <span>Открыть ({ownedCount})</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {wonModal && (
+                        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={() => setWonModal(null)}>
+                            <div className="glass-panel p-5 rounded-3xl w-full max-w-xs text-center border border-amber-500/40 shadow-2xl relative animate-popIn" onClick={e => e.stopPropagation()}>
+                                <div className="text-[10px] uppercase tracking-widest text-amber-400 font-extrabold mb-1">Выпавший Смайлик!</div>
+                                <div className="text-6xl my-3">{wonModal.smiley.emoji}</div>
+                                <div className="text-base font-bold text-white">{wonModal.smiley.name}</div>
+                                
+                                <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] my-2 ${RARITIES[wonModal.smiley.rarity].badge}`}>
+                                    {RARITIES[wonModal.smiley.rarity].name}
+                                </span>
+
+                                {wonModal.isDuplicate ? (
+                                    <div className="my-2 p-2 bg-amber-500/10 rounded-xl border border-amber-500/30 text-xs text-amber-300">
+                                        Дубликат! Конвертирован в <span className="font-bold">+{wonModal.bonusVal} S$</span>
+                                    </div>
+                                ) : (
+                                    <div className="my-2 p-2 bg-emerald-500/10 rounded-xl border border-emerald-500/30 text-xs text-emerald-300">
+                                        Новый смайлик добавлен в коллекцию!
+                                    </div>
+                                )}
+
+                                <button
+                                    onClick={() => setWonModal(null)}
+                                    className="w-full py-2.5 mt-2 bg-amber-400 text-black font-extrabold text-xs rounded-xl active:scale-95 shadow"
+                                >
+                                    Забрать
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                </div>
+            );
+        }
+
+        function CollectionTab({ state, onSelectSmiley }) {
+            const [filter, setFilter] = useState('ALL');
+
+            const filteredList = SMILEYS_DB.filter(s => {
+                if (filter === 'ALL') return true;
+                return s.rarity === filter;
+            });
+
+            const unlockedCount = state.unlockedSmileys.length;
+            const progressPct = Math.round((unlockedCount / 150) * 100);
+
+            return (
+                <div className="flex flex-col gap-3 py-2">
+                    
+                    <div className="glass-panel p-3 rounded-2xl border border-white/5">
+                        <div className="flex justify-between items-center text-xs font-bold mb-1">
+                            <span className="text-white">Собрано элементов</span>
+                            <span className="text-amber-400">{unlockedCount} / 150 ({progressPct}%)</span>
+                        </div>
+                        <div className="w-full h-2 bg-slate-900 rounded-full overflow-hidden">
+                            <div className="h-full bg-amber-400 transition-all duration-300" style={{ width: `${progressPct}%` }}></div>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-1 overflow-x-auto pb-1 text-[10px]">
+                        {['ALL', 'COMMON', 'RARE', 'EPIC', 'LEGENDARY', 'SECRET'].map(r => (
+                            <button
+                                key={r}
+                                onClick={() => setFilter(r)}
+                                className={`px-2.5 py-1 rounded-lg font-bold whitespace-nowrap transition-all ${
+                                    filter === r 
+                                        ? 'bg-amber-400 text-black shadow' 
+                                        : 'bg-slate-900 text-slate-400 border border-slate-800'
+                                }`}
+                            >
+                                {r === 'ALL' ? 'Все' : RARITIES[r].name}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                        {filteredList.map(s => {
+                            const isUnlocked = state.unlockedSmileys.includes(s.id);
+                            return (
+                                <button
+                                    key={s.id}
+                                    onClick={() => onSelectSmiley(s)}
+                                    className={`h-20 rounded-xl border flex flex-col items-center justify-center p-1 relative transition-all active:scale-95 ${
+                                        isUnlocked 
+                                            ? RARITIES[s.rarity].color 
+                                            : 'border-slate-800 bg-slate-950/60 opacity-40'
+                                    }`}
+                                >
+                                    {isUnlocked ? (
+                                        <>
+                                            <span className="text-2xl">{s.emoji}</span>
+                                            <span className="text-[8px] font-bold mt-1 text-slate-300 truncate w-full text-center">{s.name}</span>
+                                        </>
+                                    ) : (
+                                        <Icon name="lock" className="w-5 h-5 text-slate-600" />
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                </div>
+            );
+        }
+
+        function BoostsAndQuestsTab({ state, setState, triggerHaptic }) {
+            const [activeSubTab, setActiveSubTab] = useState('boosts');
+            const [promoInput, setPromoInput] = useState('');
+            const [promoStatus, setPromoStatus] = useState(null);
+
+            const clickPowerCost = Math.floor(20 * Math.pow(1.8, state.clickPower - 1));
+            const maxEnergyCost = Math.floor(30 * Math.pow(1.6, (state.maxEnergy - 1000) / 200));
+            const botCost = Math.floor(100 * Math.pow(2.2, state.botLevel));
+
+            const buyClickPower = () => {
+                if (state.balance >= clickPowerCost) {
+                    setState(prev => ({
+                        ...prev,
+                        balance: prev.balance - clickPowerCost,
+                        clickPower: prev.clickPower + 1
+                    }));
+                    soundFX.playWin();
+                    triggerHaptic();
+                }
+            };
+
+            const buyMaxEnergy = () => {
+                if (state.balance >= maxEnergyCost) {
+                    setState(prev => ({
+                        ...prev,
+                        balance: prev.balance - maxEnergyCost,
+                        maxEnergy: prev.maxEnergy + 200,
+                        energy: prev.energy + 200
+                    }));
+                    soundFX.playWin();
+                    triggerHaptic();
+                }
+            };
+
+            const buyBot = () => {
+                if (state.balance >= botCost) {
+                    setState(prev => ({
+                        ...prev,
+                        balance: prev.balance - botCost,
+                        botLevel: prev.botLevel + 1
+                    }));
+                    soundFX.playWin();
+                    triggerHaptic();
+                }
+            };
+
+            const claimQuest = (questKey, reward) => {
+                if (state.quests[questKey] === true) {
+                    setState(prev => ({
+                        ...prev,
+                        balance: prev.balance + reward,
+                        quests: { ...prev.quests, [questKey]: 'claimed' }
+                    }));
+                    soundFX.playWin();
+                    triggerHaptic();
+                }
+            };
+
+            const handleApplyPromo = () => {
+                const rawCode = promoInput.trim();
+                const codeUpper = rawCode.toUpperCase();
+                if (!codeUpper) return;
+
+                // 1. Rank Promo Codes Logic
+                if (codeUpper === 'GOLD_FOR_(NAME)' || codeUpper === 'GOLD_FOR_NAME') {
+                    setState(prev => ({ ...prev, rank: 'Золото' }));
+                    soundFX.playWin();
+                    triggerHaptic();
+                    setPromoStatus({ type: 'success', msg: '🎉 Вам присвоен ранг: Золото!' });
+                    setPromoInput('');
+                    return;
+                }
+                if (codeUpper === 'YT_FOR_(NAME)' || codeUpper === 'YT_FOR_NAME' || codeUpper === 'YOUTUBER_FOR_(NAME)') {
+                    setState(prev => ({ ...prev, rank: 'Ютубер' }));
+                    soundFX.playWin();
+                    triggerHaptic();
+                    setPromoStatus({ type: 'success', msg: '🎉 Вам присвоен ранг: Ютубер!' });
+                    setPromoInput('');
+                    return;
+                }
+                if (codeUpper === 'DEV_FOR_(NAME)' || codeUpper === 'DEV_FOR_NAME') {
+                    setState(prev => ({ ...prev, rank: 'Разработчик' }));
+                    soundFX.playWin();
+                    triggerHaptic();
+                    setPromoStatus({ type: 'success', msg: '🎉 Вам присвоен ранг: Разработчик!' });
+                    setPromoInput('');
+                    return;
+                }
+                if (codeUpper === 'PLAYER_FOR_(NAME)' || codeUpper === 'PLAYER_FOR_NAME') {
+                    setState(prev => ({ ...prev, rank: 'Игрок' }));
+                    soundFX.playWin();
+                    triggerHaptic();
+                    setPromoStatus({ type: 'success', msg: 'Ранг сброшен до: Игрок' });
+                    setPromoInput('');
+                    return;
+                }
+
+                // 2. Standard Coins Promo Codes Logic
+                if (state.usedPromoCodes && state.usedPromoCodes.includes(codeUpper)) {
+                    setPromoStatus({ type: 'error', msg: 'Этот промокод уже был использован!' });
+                    return;
+                }
+
+                const found = PROMO_CODES_DB[codeUpper];
+                if (found) {
+                    setState(prev => ({
+                        ...prev,
+                        balance: prev.balance + found.rewardCoins,
+                        clickPower: prev.clickPower + (found.rewardPower || 0),
+                        usedPromoCodes: [...(prev.usedPromoCodes || []), codeUpper]
+                    }));
+                    soundFX.playWin();
+                    triggerHaptic();
+                    setPromoStatus({ type: 'success', msg: `Промокод активирован! ${found.desc}` });
+                    setPromoInput('');
+                } else {
+                    setPromoStatus({ type: 'error', msg: 'Неверный промокод!' });
+                }
+            };
+
+            return (
+                <div className="flex flex-col gap-3 py-2">
+                    
+                    <div className="flex glass-panel p-1 rounded-xl text-[11px]">
+                        <button 
+                            onClick={() => { setActiveSubTab('boosts'); setPromoStatus(null); }}
+                            className={`flex-1 py-1.5 font-semibold rounded-lg transition-all ${activeSubTab === 'boosts' ? 'bg-amber-400 text-black shadow-sm' : 'text-slate-400'}`}
+                        >
+                            Улучшения
+                        </button>
+                        <button 
+                            onClick={() => { setActiveSubTab('quests'); setPromoStatus(null); }}
+                            className={`flex-1 py-1.5 font-semibold rounded-lg transition-all ${activeSubTab === 'quests' ? 'bg-amber-400 text-black shadow-sm' : 'text-slate-400'}`}
+                        >
+                            Задания
+                        </button>
+                        <button 
+                            onClick={() => { setActiveSubTab('promo'); setPromoStatus(null); }}
+                            className={`flex-1 py-1.5 font-semibold rounded-lg transition-all ${activeSubTab === 'promo' ? 'bg-amber-400 text-black shadow-sm' : 'text-slate-400'}`}
+                        >
+                            Промокоды
+                        </button>
+                        <button 
+                            onClick={() => { setActiveSubTab('daily'); setPromoStatus(null); }}
+                            className={`flex-1 py-1.5 font-semibold rounded-lg transition-all ${activeSubTab === 'daily' ? 'bg-amber-400 text-black shadow-sm' : 'text-slate-400'}`}
+                        >
+                            Награды
+                        </button>
+                    </div>
+
+                    {activeSubTab === 'boosts' && (
+                        <div className="space-y-2.5">
+                            <div className="glass-panel p-3 rounded-2xl flex items-center justify-between border border-white/5">
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-8 h-8 rounded-xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center text-amber-400">
+                                        <Icon name="clicker" className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                        <div className="font-bold text-xs text-white">Сила Клика</div>
+                                        <div className="text-[10px] text-slate-400">+{state.clickPower} S$ / тап</div>
+                                    </div>
+                                </div>
+                                <button
+                                    disabled={state.balance < clickPowerCost}
+                                    onClick={buyClickPower}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                                        state.balance >= clickPowerCost ? 'bg-amber-400 text-black hover:bg-amber-300' : 'bg-slate-800 text-slate-500'
+                                    }`}
+                                >
+                                    {clickPowerCost} S$
+                                </button>
+                            </div>
+
+                            <div className="glass-panel p-3 rounded-2xl flex items-center justify-between border border-white/5">
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-8 h-8 rounded-xl bg-blue-400/10 border border-blue-400/20 flex items-center justify-center text-blue-400">
+                                        <Icon name="boosts" className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                        <div className="font-bold text-xs text-white">Запас Энергии</div>
+                                        <div className="text-[10px] text-slate-400">{state.maxEnergy} макс</div>
+                                    </div>
+                                </div>
+                                <button
+                                    disabled={state.balance < maxEnergyCost}
+                                    onClick={buyMaxEnergy}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                                        state.balance >= maxEnergyCost ? 'bg-amber-400 text-black hover:bg-amber-300' : 'bg-slate-800 text-slate-500'
+                                    }`}
+                                >
+                                    {maxEnergyCost} S$
+                                </button>
+                            </div>
+
+                            <div className="glass-panel p-3 rounded-2xl flex items-center justify-between border border-white/5">
+                                <div className="flex items-center space-x-3">
+                                    <div className="w-8 h-8 rounded-xl bg-purple-400/10 border border-purple-400/20 flex items-center justify-center text-purple-400">
+                                        <Icon name="bot" className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                        <div className="font-bold text-xs text-white">Смайл-Бот (Пассив)</div>
+                                        <div className="text-[10px] text-slate-400">Ур. {state.botLevel} (+{state.botLevel} S$/сек)</div>
+                                    </div>
+                                </div>
+                                <button
+                                    disabled={state.balance < botCost}
+                                    onClick={buyBot}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                                        state.balance >= botCost ? 'bg-amber-400 text-black hover:bg-amber-300' : 'bg-slate-800 text-slate-500'
+                                    }`}
+                                >
+                                    {botCost} S$
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeSubTab === 'quests' && (
+                        <div className="space-y-2">
+                            <QuestCard title="Сделать 100 кликов" reward={50} current={state.totalClicks} target={100} status={state.quests.clicks100} onClaim={() => claimQuest('clicks100', 50)} />
+                            <QuestCard title="Сделать 500 кликов" reward={200} current={state.totalClicks} target={500} status={state.quests.clicks500} onClaim={() => claimQuest('clicks500', 200)} />
+                            <QuestCard title="Открыть 3 кейса" reward={100} current={state.casesOpened} target={3} status={state.quests.cases3 || state.casesOpened >= 3} onClaim={() => claimQuest('cases3', 100)} />
+                        </div>
+                    )}
+
+                    {activeSubTab === 'promo' && (
+                        <div className="glass-panel p-4 rounded-2xl border border-white/5 flex flex-col gap-3">
+                            <div>
+                                <div className="text-xs font-bold text-white mb-1">Активация промокода</div>
+                                <div className="text-[10px] text-slate-400">Введи секретный промокод для получения бонусных S$.</div>
+                            </div>
+
+                            <div className="flex gap-2">
+                                <input 
+                                    type="text" 
+                                    value={promoInput}
+                                    onChange={e => setPromoInput(e.target.value)}
+                                    placeholder="Введи промокод..."
+                                    className="flex-1 bg-slate-900 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 uppercase tracking-wider"
+                                />
+                                <button 
+                                    onClick={handleApplyPromo}
+                                    className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-black text-xs font-bold rounded-xl active:scale-95 transition-all shadow"
+                                >
+                                    Активировать
+                                </button>
+                            </div>
+
+                            {promoStatus && (
+                                <div className={`p-2.5 rounded-xl text-[11px] border ${
+                                    promoStatus.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-red-500/10 border-red-500/30 text-red-400'
+                                }`}>
+                                    {promoStatus.msg}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {activeSubTab === 'daily' && (
+                        <DailyRewardsTabContent state={state} setState={setState} triggerHaptic={triggerHaptic} />
+                    )}
+
+                </div>
+            );
+        }
+
+        function DailyRewardsTabContent({ state, setState, triggerHaptic }) {
+            const [timeLeft, setTimeLeft] = useState(0);
+
+            const CLAIM_COOLDOWN = 24 * 60 * 60 * 1000;
+
+            useEffect(() => {
+                const updateTimer = () => {
+                    if (!state.lastDailyClaimTime) {
+                        setTimeLeft(0);
+                        return;
+                    }
+                    const elapsed = Date.now() - state.lastDailyClaimTime;
+                    const remaining = CLAIM_COOLDOWN - elapsed;
+                    setTimeLeft(remaining > 0 ? remaining : 0);
+                };
+
+                updateTimer();
+                const interval = setInterval(updateTimer, 1000);
+                return () => clearInterval(interval);
+            }, [state.lastDailyClaimTime]);
+
+            const isAvailable = timeLeft <= 0;
+
+            const formatTime = (ms) => {
+                if (ms <= 0) return '00:00:00';
+                const totalSec = Math.floor(ms / 1000);
+                const h = Math.floor(totalSec / 3600).toString().padStart(2, '0');
+                const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, '0');
+                const s = (totalSec % 60).toString().padStart(2, '0');
+                return `${h}:${m}:${s}`;
+            };
+
+            const targetDay = (state.claimedDailyDay % 7) + 1;
+
+            return (
+                <div className="flex flex-col gap-3">
+                    <div className="grid grid-cols-3 gap-2">
+                        {[1, 2, 3, 4, 5, 6, 7].map(day => {
+                            const rewardVal = day * 50;
+                            const isClaimed = state.claimedDailyDay >= day && state.claimedDailyDay !== 0 && targetDay !== day;
+                            const isCurrent = day === targetDay;
+
+                            return (
+                                <div 
+                                    key={day} 
+                                    className={`glass-panel p-2 rounded-xl flex flex-col items-center justify-between border text-center ${
+                                        isClaimed 
+                                            ? 'bg-slate-900/40 border-slate-800 opacity-50' 
+                                            : isCurrent 
+                                                ? 'border-amber-400/60 bg-amber-400/10 shadow-[0_0_12px_rgba(255,184,0,0.15)]' 
+                                                : 'border-white/5 opacity-70'
+                                    }`}
+                                >
+                                    <span className="text-[9px] text-slate-400 font-bold">День {day}</span>
+                                    <span className="text-base my-0.5">🎁</span>
+                                    <span className="text-[10px] font-bold text-amber-300">+{rewardVal} S$</span>
+
+                                    {isCurrent && (
+                                        <button
+                                            disabled={!isAvailable}
+                                            onClick={() => {
+                                                if (!isAvailable) return;
+                                                setState(prev => ({
+                                                    ...prev,
+                                                    balance: prev.balance + rewardVal,
+                                                    claimedDailyDay: day,
+                                                    lastDailyClaimTime: Date.now()
+                                                }));
+                                                soundFX.playWin();
+                                                triggerHaptic();
+                                            }}
+                                            className={`mt-1 w-full py-1 text-[9px] font-extrabold rounded shadow transition-all ${
+                                                isAvailable 
+                                                    ? 'bg-amber-400 text-black active:scale-95 hover:bg-amber-300 cursor-pointer' 
+                                                    : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700'
+                                            }`}
+                                        >
+                                            {isAvailable ? 'Забрать' : 'Ждите'}
+                                        </button>
+                                    )}
+                                    {isClaimed && <span className="text-[8px] text-emerald-400 font-bold mt-1">Получено</span>}
+                                    {!isCurrent && !isClaimed && <span className="text-[8px] text-slate-500 font-medium mt-1">Закрыто</span>}
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    <div className="glass-panel p-3 rounded-2xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-slate-900 to-amber-500/10 text-center flex flex-col items-center justify-center gap-1 shadow-md">
+                        <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Следующая награда через</span>
+                        <div className={`text-xl font-extrabold tracking-widest ${isAvailable ? 'text-emerald-400 animate-pulse' : 'text-amber-400 font-mono'}`}>
+                            {isAvailable ? '✨ Готово к получению! ✨' : formatTime(timeLeft)}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        function QuestCard({ title, reward, current, target, status, onClaim }) {
+            const isReady = status === true;
+            const isClaimed = status === 'claimed';
+            const progress = Math.min(100, Math.round((current / target) * 100));
+
+            return (
+                <div className="glass-panel p-3 rounded-2xl border border-white/5 flex items-center justify-between">
+                    <div className="flex-1 pr-3">
+                        <div className="font-bold text-xs text-white mb-1">{title}</div>
+                        <div className="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
+                            <div className="h-full bg-amber-400" style={{ width: `${progress}%` }}></div>
+                        </div>
+                        <div className="text-[9px] text-slate-400 mt-1">Прогресс: {current} / {target}</div>
+                    </div>
+                    <div>
+                        {isClaimed ? (
+                            <span className="text-[10px] font-bold text-emerald-400">Выполнено</span>
+                        ) : (
+                            <button
+                                disabled={!isReady}
+                                onClick={onClaim}
+                                className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all ${
+                                    isReady ? 'bg-amber-400 text-black active:scale-95 shadow' : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                                }`}
+                            >
+                                +{reward} S$
+                            </button>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        function ProfileTab({ state, setState, setEditNickModal, triggerHaptic }) {
+            const [color1, setColor1] = useState('#ff007f');
+            const [color2, setColor2] = useState('#7f00ff');
+
+            const GRADIENTS = [
+                'from-amber-500 to-amber-700',
+                'from-blue-600 to-indigo-900',
+                'from-emerald-500 to-teal-900',
+                'from-purple-600 to-pink-800',
+                'from-red-500 to-orange-700'
+            ];
+
+            const buyCustomGradient = () => {
+                if (state.balance >= 40) {
+                    const customGradClass = `[background:linear-gradient(135deg,${color1},${color2})]`;
+                    setState(prev => ({
+                        ...prev,
+                        balance: prev.balance - 40,
+                        bgGradient: customGradClass,
+                        hasCustomBg: true
+                    }));
+                    soundFX.playWin();
+                    triggerHaptic();
+                }
+            };
+
+            const resetProgress = () => {
+                if (window.confirm('Вы уверены? Весь прогресс, S$ и коллекция будут полностью сброшены!')) {
+                    localStorage.removeItem('Smilecoin_SaveData');
+                    window.location.reload();
+                }
+            };
+
+            return (
+                <div className="flex flex-col gap-3 py-2">
+                    
+                    <div className="glass-panel p-4 rounded-2xl border border-white/5 flex flex-col items-center text-center">
+                        <div className={`w-16 h-16 rounded-2xl bg-gradient-to-tr ${state.bgGradient} flex items-center justify-center text-4xl shadow border border-white/20 mb-2`}>
+                            {SMILEYS_DB.find(s => s.id === state.avatarId)?.emoji || "😀"}
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-extrabold text-white">{state.nickname}</span>
+                            <button onClick={() => setEditNickModal(true)} className="p-1 glass-btn rounded-lg text-amber-400">
+                                <Icon name="edit" className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+
+                        <div className="mt-1">
+                            <RankBadge rank={state.rank || 'Игрок'} large />
+                        </div>
+                    </div>
+
+                    <div className="glass-panel p-3 rounded-2xl border border-white/5">
+                        <div className="text-xs font-bold text-white mb-2 flex items-center justify-between">
+                            <span>Фон аватара</span>
+                            <span className="text-amber-400 font-extrabold">40 S$</span>
+                        </div>
+
+                        <div className="flex gap-2 mb-2">
+                            {GRADIENTS.map((g, idx) => (
+                                <button
+                                    key={idx}
+                                    onClick={() => setState(prev => ({ ...prev, bgGradient: g }))}
+                                    className={`w-7 h-7 rounded-lg bg-gradient-to-tr ${g} border border-white/10 active:scale-95`}
+                                />
+                            ))}
+                        </div>
+
+                        <div className="flex items-center justify-between bg-slate-900/80 p-2 rounded-xl border border-white/5">
+                            <div className="flex items-center space-x-1.5">
+                                <input type="color" value={color1} onChange={e => setColor1(e.target.value)} className="w-5 h-5 rounded bg-transparent cursor-pointer" />
+                                <input type="color" value={color2} onChange={e => setColor2(e.target.value)} className="w-5 h-5 rounded bg-transparent cursor-pointer" />
+                                <span className="text-[10px] text-slate-300">Кастомный цвет</span>
+                            </div>
+                            <button
+                                disabled={state.balance < 40}
+                                onClick={buyCustomGradient}
+                                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${state.balance >= 40 ? 'bg-amber-400 text-black' : 'bg-slate-800 text-slate-500'}`}
+                            >
+                                Создать
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="glass-panel p-3 rounded-2xl border border-white/5 space-y-1 text-xs">
+                        <div className="font-bold text-amber-400 text-[11px] mb-1">Статистика игрока</div>
+                        <div className="flex justify-between text-slate-300"><span>Текущий ранг:</span><span className="font-bold text-white">{state.rank || 'Игрок'}</span></div>
+                        <div className="flex justify-between text-slate-300"><span>Всего кликов:</span><span className="font-bold text-white">{state.totalClicks}</span></div>
+                        <div className="flex justify-between text-slate-300"><span>Открыто кейсов:</span><span className="font-bold text-white">{state.casesOpened}</span></div>
+                        <div className="flex justify-between text-slate-300"><span>Потрачено S$:</span><span className="font-bold text-white">{state.totalSpent}</span></div>
+                        <div className="flex justify-between text-slate-300"><span>Собрано смайликов:</span><span className="font-bold text-white">{state.unlockedSmileys.length} / 150</span></div>
+                    </div>
+
+                    <div className="glass-panel p-2.5 rounded-2xl border border-white/5 flex flex-col gap-2">
+                        <button
+                            onClick={() => setState(prev => ({ ...prev, soundEnabled: !prev.soundEnabled }))}
+                            className="flex justify-between items-center p-2 rounded-xl glass-btn text-xs font-bold text-slate-200"
+                        >
+                            <span>Звуковые Эффекты</span>
+                            <Icon name={state.soundEnabled ? "soundOn" : "soundOff"} className="w-4 h-4 text-amber-400" />
+                        </button>
+
+                        <button
+                            onClick={resetProgress}
+                            className="p-2 rounded-xl bg-red-500/10 border border-red-500/20 text-xs font-bold text-red-400 active:scale-95 transition-all text-center"
+                        >
+                            Сбросить Весь Прогресс
+                        </button>
+                    </div>
+
+                </div>
+            );
+        }
+
+        function SmileyDetailModal({ smiley, isUnlocked, isAvatar, onSetAvatar, onClose }) {
+            return (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={onClose}>
+                    <div className="glass-panel p-5 rounded-3xl w-full max-w-xs text-center border border-white/10 shadow-2xl relative animate-popIn" onClick={e => e.stopPropagation()}>
+                        <div className="text-5xl my-2">{isUnlocked ? smiley.emoji : '❓'}</div>
+                        <div className="text-base font-bold text-white">{smiley.name}</div>
+                        <div className="text-xs text-slate-400 my-1">{smiley.desc}</div>
+
+                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[9px] my-2 ${RARITIES[smiley.rarity].badge}`}>
+                            {RARITIES[smiley.rarity].name}
+                        </span>
+
+                        {isUnlocked ? (
+                            <button
+                                disabled={isAvatar}
+                                onClick={onSetAvatar}
+                                className={`w-full py-2 mt-2 rounded-xl font-bold text-xs shadow transition-all ${
+                                    isAvatar ? 'bg-slate-800 text-slate-500' : 'bg-amber-400 text-black hover:bg-amber-300'
+                                }`}
+                            >
+                                {isAvatar ? 'Установлен на аватар' : 'Установить на аватар'}
+                            </button>
+                        ) : (
+                            <div className="text-[11px] text-amber-400 my-2 font-semibold">
+                                Доступно в кейсах магазина!
+                            </div>
+                        )}
+
+                        <button onClick={onClose} className="mt-2 text-xs text-slate-400 underline">Закрыть</button>
+                    </div>
+                </div>
+            );
+        }
+
+        function OfflineEarnModal({ data, onClose }) {
+            return (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={onClose}>
+                    <div className="glass-panel p-5 rounded-3xl w-full max-w-xs text-center border border-amber-500/30 shadow-2xl animate-popIn" onClick={e => e.stopPropagation()}>
+                        <div className="text-4xl my-2">🤖</div>
+                        <div className="text-base font-extrabold text-white">Смайл-Бот Сработал!</div>
+                        <div className="text-xs text-slate-300 my-1">
+                            Пока вас не было, бот майнил S$ в течение {Math.floor(data.timeSec / 60)} мин.
+                        </div>
+                        <div className="text-xl font-black text-amber-400 my-2">+{data.earned} S$</div>
+                        <button
+                            onClick={onClose}
+                            className="w-full py-2.5 bg-amber-400 text-black font-extrabold text-xs rounded-xl shadow active:scale-95"
+                        >
+                            Забрать Награду
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        function EditNickModal({ nickname, setNickname, onSave, onClose }) {
+            return (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4" onClick={onClose}>
+                    <div className="glass-panel p-5 rounded-3xl w-full max-w-xs border border-white/10 shadow-2xl animate-popIn" onClick={e => e.stopPropagation()}>
+                        <div className="text-xs font-bold text-white mb-3 text-center">Изменить Никнейм</div>
+                        <input 
+                            type="text" 
+                            value={nickname}
+                            onChange={e => setNickname(e.target.value)}
+                            maxLength={16}
+                            className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white text-xs mb-3 focus:outline-none focus:border-amber-400"
+                        />
+                        <div className="flex gap-2">
+                            <button onClick={onClose} className="flex-1 py-1.5 glass-btn text-xs text-slate-300 rounded-xl">Отмена</button>
+                            <button onClick={onSave} className="flex-1 py-1.5 bg-amber-400 text-black font-bold text-xs rounded-xl">Сохранить</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
